@@ -1,0 +1,15 @@
+# 系統文件
+.DS_Store
+Thumbs.db
+
+# IDE 文件
+.vscode/
+.idea/
+
+# 日誌文件
+*.log
+npm-debug.log*
+
+# 臨時文件
+tmp/
+temp/
