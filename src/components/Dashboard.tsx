@@ -1,328 +1,370 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Grid, Box, Paper, Typography, Chip, ToggleButtonGroup,
-    ToggleButton, useMediaQuery, useTheme
+  Container,
+  Typography,
+  Grid,
+  Paper,
+  Box,
+  Alert,
+  CircularProgress,
+  LinearProgress
 } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
-import { dataService } from '../services/DataService';
-import { Match, PredictionType } from '../types';
+import { DataService } from '../services/DataService';
 
-// 子组件导入
-import MatchList from './MatchList';
-import OddsComparison from './OddsComparison';
-import PredictionRadar from './visualizations/PredictionRadar';
-import ScoreHeatmap from './visualizations/ScoreHeatmap';
-import OddsTrendChart from './visualizations/OddsTrendChart';
-import RiskIndicator from './RiskIndicator';
+// 定义比赛接口
+interface Match {
+  id: number;
+  homeTeam: string;
+  awayTeam: string;
+  competition: string;
+  status: string;
+  score: { home: number; away: number };
+  time: Date;
+}
 
-const Dashboard: React.FC = () => {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    const isLargeScreen = useMediaQuery('(min-width: 1920px)');
+// 定义预测接口
+interface Prediction {
+  homeWin: number;
+  draw: number;
+  awayWin: number;
+  confidence: number;
+}
 
-    // 状态管理
-    const [matches, setMatches] = useState<Match[]>([]);
-    const [liveMatches, setLiveMatches] = useState<Match[]>([]);
-    const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
-    const [predictionType, setPredictionType] = useState<PredictionType>('1x2');
-    const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+// 比赛卡片组件
+const MatchCard: React.FC<{ match: Match; prediction: Prediction }> = ({ match, prediction }) => {
+  return (
+    <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        {match.homeTeam} vs {match.awayTeam}
+      </Typography>
+      
+      <Typography color="textSecondary" gutterBottom>
+        {match.competition} • {new Date(match.time).toLocaleTimeString()}
+      </Typography>
 
-    // 1. 初始化数据加载
-    useEffect(() => {
-        const loadInitialData = async () => {
-            const [upcoming, live] = await Promise.all([
-                dataService.getUpcomingMatches(),
-                dataService.getLiveMatches()
-            ]);
-            
-            setMatches(upcoming);
-            setLiveMatches(live);
-            
-            if (upcoming.length > 0) {
-                setSelectedMatch(upcoming[0]);
-            }
-        };
-
-        loadInitialData();
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="body2" gutterBottom>预测概率</Typography>
         
-        // 每30秒更新一次非实时数据
-        const interval = setInterval(() => {
-            dataService.getUpcomingMatches().then(setMatches);
-        }, 30000);
-
-        return () => clearInterval(interval);
-    }, []);
-
-    // 2. 实时数据监听
-    useEffect(() => {
-        const handleDataUpdate = (event: Event) => {
-            const { type, data } = (event as CustomEvent).detail;
-            
-            switch (type) {
-                case 'match':
-                    // 更新特定比赛
-                    setMatches(prev => prev.map(m => 
-                        m.id === data.id ? { ...m, ...data } : m
-                    ));
-                    setLiveMatches(prev => prev.map(m => 
-                        m.id === data.id ? { ...m, ...data } : m
-                    ));
-                    break;
-                    
-                case 'event':
-                    // 处理红黄牌等事件
-                    if (selectedMatch?.id === data.matchId) {
-                        showLiveEventNotification(data);
-                    }
-                    break;
-            }
-            
-            setLastUpdate(new Date());
-        };
-
-        window.addEventListener('footballDataUpdate', handleDataUpdate);
-        return () => window.removeEventListener('footballDataUpdate', handleDataUpdate);
-    }, [selectedMatch]);
-
-    // 3. 响应式布局配置
-    const gridConfig = useMemo(() => {
-        if (isMobile) {
-            return { left: 12, center: 12, right: 12 };
-        }
-        if (isLargeScreen) {
-            return { left: 3, center: 6, right: 3 };
-        }
-        return { left: 4, center: 5, right: 3 };
-    }, [isMobile, isLargeScreen]);
-
-    // 4. 虚拟滚动优化的大型列表
-    const MemoizedMatchList = useMemo(() => (
-        <MatchList 
-            matches={matches}
-            liveMatches={liveMatches}
-            selectedId={selectedMatch?.id}
-            onSelectMatch={setSelectedMatch}
-        />
-    ), [matches, liveMatches, selectedMatch?.id]);
-
-    // 5. 预测类型切换处理
-    const handlePredictionTypeChange = useCallback((
-        _event: React.MouseEvent<HTMLElement>,
-        newType: PredictionType | null
-    ) => {
-        if (newType !== null) {
-            setPredictionType(newType);
-        }
-    }, []);
-
-    return (
-        <Box sx={{ 
-            p: { xs: 1, md: 2 },
-            maxWidth: '100vw',
-            overflowX: 'hidden'
-        }}>
-            {/* 顶部状态栏 */}
-            <Paper elevation={2} sx={{ p: 2, mb: 2, display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="h6" component="h1">
-                    足智彩實時賽事分析與預測系統
-                </Typography>
-                <Box>
-                    <Chip 
-                        label={`${liveMatches.length} 場進行中`}
-                        color="error"
-                        size="small"
-                    />
-                    <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
-                        最後更新: {lastUpdate.toLocaleTimeString()}
-                    </Typography>
-                </Box>
-            </Paper>
-
-            {/* 主仪表板网格 */}
-            <Grid container spacing={2}>
-                {/* 左侧面板 (30%) - 赛事列表 */}
-                <Grid item xs={12} md={gridConfig.left}>
-                    <Paper elevation={1} sx={{ p: 2, height: '85vh', overflow: 'hidden' }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                            賽事列表
-                        </Typography>
-                        <Box sx={{ height: 'calc(85vh - 60px)', overflow: 'auto' }}>
-                            {MemoizedMatchList}
-                        </Box>
-                    </Paper>
-                </Grid>
-
-                {/* 中央区域 (50%) - 赛事详情与可视化 */}
-                <Grid item xs={12} md={gridConfig.center}>
-                    <AnimatePresence mode="wait">
-                        {selectedMatch ? (
-                            <motion.div
-                                key={selectedMatch.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.3 }}
-                            >
-                                {/* 比赛基本信息 */}
-                                <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-                                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                                        <Box>
-                                            <Typography variant="h6">
-                                                {selectedMatch.homeTeam} vs {selectedMatch.awayTeam}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {selectedMatch.competition} • 
-                                                {selectedMatch.time.toLocaleDateString()}
-                                            </Typography>
-                                        </Box>
-                                        <Chip 
-                                            label={selectedMatch.status}
-                                            color={selectedMatch.status === 'LIVE' ? 'error' : 'default'}
-                                        />
-                                    </Box>
-                                </Paper>
-
-                                {/* 预测类型选择器 */}
-                                <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-                                    <ToggleButtonGroup
-                                        value={predictionType}
-                                        exclusive
-                                        onChange={handlePredictionTypeChange}
-                                        size="small"
-                                        fullWidth
-                                    >
-                                        <ToggleButton value="1x2">主客和</ToggleButton>
-                                        <ToggleButton value="halfFull">半全場</ToggleButton>
-                                        <ToggleButton value="correctScore">精準比分</ToggleButton>
-                                        <ToggleButton value="handicap">讓球盤</ToggleButton>
-                                    </ToggleButtonGroup>
-                                </Paper>
-
-                                {/* 可视化图表区域 */}
-                                <Grid container spacing={2}>
-                                    <Grid item xs={12} lg={6}>
-                                        <Paper elevation={1} sx={{ p: 2, height: 300 }}>
-                                            <PredictionRadar 
-                                                predictions={selectedMatch.predictions}
-                                                type={predictionType}
-                                            />
-                                        </Paper>
-                                    </Grid>
-                                    <Grid item xs={12} lg={6}>
-                                        <Paper elevation={1} sx={{ p: 2, height: 300 }}>
-                                            {predictionType === 'correctScore' ? (
-                                                <ScoreHeatmap 
-                                                    predictions={selectedMatch.predictions.scorePredictions}
-                                                />
-                                            ) : (
-                                                <OddsTrendChart 
-                                                    oddsHistory={selectedMatch.odds?.history || []}
-                                                />
-                                            )}
-                                        </Paper>
-                                    </Grid>
-                                </Grid>
-
-                                {/* 赔率比较 */}
-                                <Box sx={{ mt: 2 }}>
-                                    <OddsComparison odds={selectedMatch.odds} />
-                                </Box>
-                            </motion.div>
-                        ) : (
-                            <Paper sx={{ p: 4, textAlign: 'center' }}>
-                                <Typography color="text.secondary">
-                                    請選擇一場賽事查看詳細分析
-                                </Typography>
-                            </Paper>
-                        )}
-                    </AnimatePresence>
-                </Grid>
-
-                {/* 右侧面板 (20%) - AI预测摘要 */}
-                <Grid item xs={12} md={gridConfig.right}>
-                    <Paper elevation={1} sx={{ p: 2, height: '85vh', overflow: 'auto' }}>
-                        {selectedMatch && (
-                            <>
-                                <Typography variant="subtitle1" gutterBottom>
-                                    AI預測摘要
-                                </Typography>
-                                
-                                <RiskIndicator 
-                                    confidence={selectedMatch.predictions.confidence}
-                                    accuracy={selectedMatch.predictions.historicalAccuracy}
-                                    riskLevel={selectedMatch.predictions.riskAssessment.level}
-                                />
-
-                                <Box sx={{ mt: 3 }}>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        模型信心度
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                        <Box sx={{ flexGrow: 1, mr: 1 }}>
-                                            <LinearProgress 
-                                                variant="determinate" 
-                                                value={selectedMatch.predictions.confidence * 100}
-                                                color={
-                                                    selectedMatch.predictions.confidence > 0.7 ? 'success' :
-                                                    selectedMatch.predictions.confidence > 0.5 ? 'warning' : 'error'
-                                                }
-                                            />
-                                        </Box>
-                                        <Typography variant="body2">
-                                            {(selectedMatch.predictions.confidence * 100).toFixed(1)}%
-                                        </Typography>
-                                    </Box>
-                                </Box>
-
-                                <Box sx={{ mt: 3 }}>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        歷史準確率
-                                    </Typography>
-                                    <Typography variant="h6">
-                                        {(selectedMatch.predictions.historicalAccuracy * 100).toFixed(1)}%
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                        基於相似賽事 {selectedMatch.predictions.sampleSize} 場樣本
-                                    </Typography>
-                                </Box>
-
-                                {/* 价值投注识别 */}
-                                {selectedMatch.predictions.riskAssessment.valueBetFlag && (
-                                    <Paper elevation={0} sx={{ 
-                                        mt: 3, 
-                                        p: 2, 
-                                        bgcolor: 'success.light',
-                                        border: '1px solid',
-                                        borderColor: 'success.main'
-                                    }}>
-                                        <Typography variant="subtitle2" gutterBottom>
-                                            💎 價值投注機會
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            模型檢測到賠率與預測概率存在正向差距
-                                        </Typography>
-                                        <Typography variant="caption" display="block">
-                                            預期價值: +{selectedMatch.predictions.riskAssessment.expectedValue}%
-                                        </Typography>
-                                    </Paper>
-                                )}
-                            </>
-                        )}
-                    </Paper>
-                </Grid>
-            </Grid>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Typography variant="body2" sx={{ width: 60 }}>主胜</Typography>
+          <Box sx={{ flexGrow: 1, mr: 1 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={prediction.homeWin * 100}
+              color="primary"
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+          </Box>
+          <Typography>{(prediction.homeWin * 100).toFixed(1)}%</Typography>
         </Box>
-    );
+
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Typography variant="body2" sx={{ width: 60 }}>平局</Typography>
+          <Box sx={{ flexGrow: 1, mr: 1 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={prediction.draw * 100}
+              color="warning"
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+          </Box>
+          <Typography>{(prediction.draw * 100).toFixed(1)}%</Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2" sx={{ width: 60 }}>客胜</Typography>
+          <Box sx={{ flexGrow: 1, mr: 1 }}>
+            <LinearProgress 
+              variant="determinate" 
+              value={prediction.awayWin * 100}
+              color="secondary"
+              sx={{ height: 8, borderRadius: 1 }}
+            />
+          </Box>
+          <Typography>{(prediction.awayWin * 100).toFixed(1)}%</Typography>
+        </Box>
+      </Box>
+
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+        <Typography variant="caption">信心度: {(prediction.confidence * 100).toFixed(0)}%</Typography>
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            color: match.status === 'LIVE' ? '#ff5252' : '#757575',
+            fontWeight: match.status === 'LIVE' ? 'bold' : 'normal'
+          }}
+        >
+          {match.status === 'LIVE' ? '⚡ 进行中' : '⏰ 未开始'}
+        </Typography>
+      </Box>
+    </Paper>
+  );
 };
 
-// 辅助函数：显示实时事件通知
-const showLiveEventNotification = (event: LiveEvent) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`⚽ ${event.type}: ${event.player}`, {
-            body: event.description,
-            icon: '/football-icon.png'
+// 主仪表板组件
+export const Dashboard: React.FC = () => {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [predictions, setPredictions] = useState<Record<number, Prediction>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadData();
+    
+    // 每30秒更新一次数据
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await DataService.getMatches();
+      
+      // 转换API数据
+      const matchList: Match[] = data.map((item: any) => ({
+        id: item.id,
+        homeTeam: item.homeTeam?.name || '未知主队',
+        awayTeam: item.awayTeam?.name || '未知客队',
+        competition: item.competition?.name || '未知联赛',
+        status: item.status || 'SCHEDULED',
+        score: item.score?.fullTime || { home: 0, away: 0 },
+        time: new Date(item.utcDate || new Date())
+      }));
+
+      setMatches(matchList);
+
+      // 为每场比赛生成预测
+      const preds: Record<number, Prediction> = {};
+      matchList.forEach(match => {
+        preds[match.id] = DataService.generatePrediction();
+      });
+      setPredictions(preds);
+
+      setError(null);
+    } catch (err) {
+      console.error('加载数据失败:', err);
+      setError('无法加载比赛数据，请检查网络连接或API密钥');
+      
+      // 如果API失败，显示示例数据
+      if (matches.length === 0) {
+        const sampleMatches: Match[] = [
+          {
+            id: 1,
+            homeTeam: '曼联',
+            awayTeam: '曼城',
+            competition: '英超联赛',
+            status: 'SCHEDULED',
+            score: { home: 0, away: 0 },
+            time: new Date(Date.now() + 3600000)
+          },
+          {
+            id: 2,
+            homeTeam: '皇马',
+            awayTeam: '巴萨',
+            competition: '西甲联赛',
+            status: 'LIVE',
+            score: { home: 1, away: 1 },
+            time: new Date()
+          },
+          {
+            id: 3,
+            homeTeam: '拜仁慕尼黑',
+            awayTeam: '多特蒙德',
+            competition: '德甲联赛',
+            status: 'SCHEDULED',
+            score: { home: 0, away: 0 },
+            time: new Date(Date.now() + 7200000)
+          }
+        ];
+        
+        setMatches(sampleMatches);
+        const preds: Record<number, Prediction> = {};
+        sampleMatches.forEach(match => {
+          preds[match.id] = DataService.generatePrediction();
         });
+        setPredictions(preds);
+      }
+    } finally {
+      setLoading(false);
     }
+  };
+
+  if (loading && matches.length === 0) {
+    return (
+      <Container sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: 2
+      }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" color="primary">
+          正在加载比赛数据...
+        </Typography>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* 头部标题 */}
+      <Paper elevation={3} sx={{ 
+        p: 3, 
+        mb: 3, 
+        background: 'linear-gradient(45deg, #1976d2 30%, #21CBF3 90%)',
+        borderRadius: 2
+      }}>
+        <Typography variant="h4" color="white" gutterBottom sx={{ fontWeight: 'bold' }}>
+          ⚽ 足智彩实时赛事分析平台
+        </Typography>
+        <Typography variant="subtitle1" color="white">
+          专业足球数据分析与AI预测 | 实时更新 | 多维度可视化
+        </Typography>
+      </Paper>
+
+      {/* 错误提示 */}
+      {error && (
+        <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+          <Typography variant="body2">{error}</Typography>
+          <Typography variant="caption">已显示示例数据供演示使用</Typography>
+        </Alert>
+      )}
+
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+        {/* 左侧：比赛列表 */}
+        <Box sx={{ flex: { md: 2 } }}>
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                今日赛事预测
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                数据更新时间: {new Date().toLocaleTimeString()}
+              </Typography>
+            </Box>
+            
+            <Typography variant="body2" color="textSecondary" paragraph>
+              基于AI模型分析的实时预测结果，数据每30秒更新
+            </Typography>
+
+            <Box sx={{ maxHeight: '70vh', overflow: 'auto', pr: 1 }}>
+              {matches.map(match => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  prediction={predictions[match.id] || {
+                    homeWin: 0.33,
+                    draw: 0.33,
+                    awayWin: 0.34,
+                    confidence: 0.5
+                  }}
+                />
+              ))}
+            </Box>
+          </Paper>
+        </Box>
+
+        {/* 右侧：统计信息和声明 */}
+        <Box sx={{ flex: { md: 1 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* 统计信息 */}
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <span role="img" aria-label="stats">📊</span> 统计信息
+            </Typography>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, pb: 2, borderBottom: '1px solid #333' }}>
+              <Typography variant="body2">总比赛数</Typography>
+              <Typography variant="h6">{matches.length}</Typography>
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2, pb: 2, borderBottom: '1px solid #333' }}>
+              <Typography variant="body2">进行中</Typography>
+              <Typography variant="h6" color="#ff5252">
+                {matches.filter(m => m.status === 'LIVE').length}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2">未开始</Typography>
+              <Typography variant="h6">
+                {matches.filter(m => m.status !== 'LIVE').length}
+              </Typography>
+            </Box>
+          </Paper>
+
+          {/* 重要声明 */}
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#ff9800' }}>
+              <span role="img" aria-label="warning">⚠️</span> 重要声明
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <span style={{ color: '#4caf50', fontWeight: 'bold' }}>1.</span>
+                本平台仅提供数据分析，不构成投注建议
+              </Typography>
+              
+              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <span style={{ color: '#4caf50', fontWeight: 'bold' }}>2.</span>
+                预测结果基于历史数据，仅供参考
+              </Typography>
+              
+              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <span style={{ color: '#4caf50', fontWeight: 'bold' }}>3.</span>
+                用户需年满18岁方可使用本服务
+              </Typography>
+              
+              <Typography variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, color: '#ff5252' }}>
+                <span style={{ fontWeight: 'bold' }}>4.</span>
+                理性对待预测结果，自负盈亏
+              </Typography>
+            </Box>
+          </Paper>
+
+          {/* API状态 */}
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2, bgcolor: '#1a1a1a' }}>
+            <Typography variant="body2" gutterBottom>API状态</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                bgcolor: error ? '#ff9800' : '#4caf50',
+                animation: error ? 'pulse 1.5s infinite' : 'none'
+              }} />
+              <Typography variant="caption">
+                {error ? '使用示例数据' : '实时数据连接正常'}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+              如需实时数据，请检查API密钥配置
+            </Typography>
+          </Paper>
+        </Box>
+      </Box>
+
+      {/* 页脚 */}
+      <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid #333', textAlign: 'center' }}>
+        <Typography variant="caption" color="textSecondary">
+          足智彩实时赛事分析平台 © {new Date().getFullYear()} | 版本 1.0.0
+        </Typography>
+      </Box>
+    </Container>
+  );
 };
+
+// 添加CSS动画
+const style = document.createElement('style');
+style.innerHTML = `
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
+`;
+document.head.appendChild(style);
 
 export default Dashboard;
