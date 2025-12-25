@@ -1,0 +1,19 @@
+{
+  "matches": [
+    {
+      "id": 1,
+      "home": "曼聯",
+      "away": "利物浦",
+      "league": "英超",
+      "time": "2024-01-15T20:00:00",
+      "status": "live",
+      "homeScore": 2,
+      "awayScore": 1,
+      "predictions": {
+        "homeWin": 45,
+        "draw": 30,
+        "awayWin": 25
+      }
+    }
+  ]
+}

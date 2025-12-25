@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>足球賽事預測系統</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 導航欄 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <i class="fas fa-futbol"></i>
+                <span>足球預測系統</span>
+            </div>
+            <div class="nav-links">
+                <a href="#" class="active"><i class="fas fa-home"></i> 首頁</a>
+                <a href="#"><i class="fas fa-calendar-alt"></i> 賽程</a>
+                <a href="#"><i class="fas fa-chart-line"></i> 預測</a>
+                <a href="#"><i class="fas fa-cog"></i> 設置</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主內容 -->
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-bolt"></i> 即時賽事預測</h1>
+            <p class="subtitle">AI 驅動的足球賽事分析與預測平台</p>
+        </header>
+
+        <!-- 統計卡片 -->
+        <div class="stats-container">
+            <div class="stat-card blue">
+                <i class="fas fa-trophy"></i>
+                <h3>今日賽事</h3>
+                <p class="number">12</p>
+            </div>
+            <div class="stat-card green">
+                <i class="fas fa-running"></i>
+                <h3>進行中</h3>
+                <p class="number">5</p>
+            </div>
+            <div class="stat-card orange">
+                <i class="fas fa-chart-pie"></i>
+                <h3>預測準確率</h3>
+                <p class="number">78.5%</p>
+            </div>
+            <div class="stat-card red">
+                <i class="fas fa-users"></i>
+                <h3>在線用戶</h3>
+                <p class="number">1,234</p>
+            </div>
+        </div>
+
+        <!-- 賽事列表 -->
+        <div class="matches-container">
+            <h2><i class="fas fa-list-ol"></i> 今日賽事列表</h2>
+            
+            <div class="match-card">
+                <div class="match-header">
+                    <span class="league">英超聯賽</span>
+                    <span class="time">20:00</span>
+                    <span class="status live"><i class="fas fa-circle"></i> 進行中</span>
+                </div>
+                <div class="teams">
+                    <div class="team">
+                        <img src="https://img.icons8.com/color/48/000000/manchester-united.png" alt="曼聯">
+                        <span>曼聯</span>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team">
+                        <img src="https://img.icons8.com/color/48/000000/liverpool-fc.png" alt="利物浦">
+                        <span>利物浦</span>
+                    </div>
+                </div>
+                <div class="score">
+                    <span class="home-score">2</span>
+                    <span class="divider">-</span>
+                    <span class="away-score">1</span>
+                </div>
+                <div class="predictions">
+                    <div class="prediction-item">
+                        <span>主勝</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill" style="width: 45%">45%</div>
+                        </div>
+                    </div>
+                    <div class="prediction-item">
+                        <span>平局</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill draw" style="width: 30%">30%</div>
+                        </div>
+                    </div>
+                    <div class="prediction-item">
+                        <span>客勝</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill away" style="width: 25%">25%</div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-details"><i class="fas fa-chart-bar"></i> 查看詳細分析</button>
+            </div>
+
+            <div class="match-card">
+                <div class="match-header">
+                    <span class="league">西甲聯賽</span>
+                    <span class="time">22:30</span>
+                    <span class="status upcoming">未開始</span>
+                </div>
+                <div class="teams">
+                    <div class="team">
+                        <img src="https://img.icons8.com/color/48/000000/fc-barcelona.png" alt="巴塞羅那">
+                        <span>巴塞羅那</span>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team">
+                        <img src="https://img.icons8.com/color/48/000000/real-madrid.png" alt="皇家馬德里">
+                        <span>皇家馬德里</span>
+                    </div>
+                </div>
+                <div class="predictions">
+                    <div class="prediction-item">
+                        <span>主勝</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill" style="width: 40%">40%</div>
+                        </div>
+                    </div>
+                    <div class="prediction-item">
+                        <span>平局</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill draw" style="width: 35%">35%</div>
+                        </div>
+                    </div>
+                    <div class="prediction-item">
+                        <span>客勝</span>
+                        <div class="prediction-bar">
+                            <div class="bar-fill away" style="width: 25%">25%</div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-predict"><i class="fas fa-robot"></i> AI 預測</button>
+            </div>
+        </div>
+
+        <!-- AI 預測區 -->
+        <div class="ai-prediction">
+            <h2><i class="fas fa-robot"></i> AI 預測分析</h2>
+            <div class="prediction-result">
+                <h3>巴塞羅那 vs 皇家馬德里</h3>
+                <div class="prediction-grid">
+                    <div class="prediction-box">
+                        <h4>最可能比分</h4>
+                        <p class="score">2-1</p>
+                        <p class="probability">35% 概率</p>
+                    </div>
+                    <div class="prediction-box">
+                        <h4>半全場</h4>
+                        <p class="result">平/主</p>
+                        <p class="probability">18% 概率</p>
+                    </div>
+                    <div class="prediction-box">
+                        <h4>總進球</h4>
+                        <p class="goals">2-3 球</p>
+                        <p class="probability">60% 概率</p>
+                    </div>
+                </div>
+                <div class="ai-recommendation">
+                    <h4><i class="fas fa-lightbulb"></i> AI 建議</h4>
+                    <p>根據歷史數據分析，主隊在主場有較強優勢，建議關注主隊不敗。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 免責聲明 -->
+        <div class="disclaimer">
+            <h3><i class="fas fa-exclamation-triangle"></i> 免責聲明</h3>
+            <p>本系統提供的所有預測僅供參考，不構成投注建議。足球賽事結果受多種因素影響，請理性看待預測結果。</p>
+        </div>
+    </div>
+
+    <!-- 頁腳 -->
+    <footer class="footer">
+        <p>© 2024 足球預測系統 | 僅供學習研究使用</p>
+        <p>數據來源：公開體育數據 | 預測模型：AI 分析系統</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

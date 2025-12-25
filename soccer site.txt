@@ -1,0 +1,30 @@
+https://visionary-travesseiro-ffd915.netlify.app/
+
+soccer1 deepseek api
+sk-f2c54bdfe43c4520b5c8f294f10e1f93
+
+Football-Data.org
+API token: d32d44ccb25d4562bbe9ac66939dac91
+
+
+
+
+
+curl --request GET 
+	--url 'https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h=33-34' 
+	--header 'x-rapidapi-host: api-football-v1.p.rapidapi.com'
+	
+	
+fetch("https://api-football-v1.p.rapidapi.com/v3/{endpoint}", {
+    "method": "GET",
+    "headers": {
+        "x-rapidapi-host": "https://api-football-v1.p.rapidapi.com/v3",
+        "x-rapidapi-key": "XxXxXxXxXxXxXxXxXxXxXxXx"
+    }
+})
+.then(response =&gt; {
+    console.log(response);
+})
+.catch(err =&gt; {
+    console.log(err);
+});
