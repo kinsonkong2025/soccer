@@ -1,410 +1,362 @@
-// 等待頁面加載完成
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('足球預測系統已加載');
-    
-    // 模擬數據
-    const matchesData = [
-        {
-            id: 1,
-            league: '英超聯賽',
-            home: '曼聯',
-            away: '利物浦',
-            time: '20:00',
-            status: 'live',
-            homeScore: 2,
-            awayScore: 1,
-            predictions: { home: 45, draw: 30, away: 25 }
-        },
-        {
-            id: 2,
-            league: '西甲聯賽',
-            home: '巴塞羅那',
-            away: '皇家馬德里',
-            time: '22:30',
-            status: 'upcoming',
-            predictions: { home: 40, draw: 35, away: 25 }
-        },
-        {
-            id: 3,
-            league: '德甲聯賽',
-            home: '拜仁慕尼黑',
-            away: '多特蒙德',
-            time: '21:30',
-            status: 'upcoming',
-            predictions: { home: 55, draw: 25, away: 20 }
-        },
-        {
-            id: 4,
-            league: '意甲聯賽',
-            home: '尤文圖斯',
-            away: 'AC米蘭',
-            time: '23:00',
-            status: 'upcoming',
-            predictions: { home: 38, draw: 32, away: 30 }
-        }
-    ];
+import ApiService from './services/api.service.js';
+import PredictionService from './services/prediction.service.js';
 
-    // 模擬實時更新分數
-    function updateLiveScore() {
-        const liveMatch = document.querySelector('.status.live');
-        if (liveMatch) {
-            const scoreElement = document.querySelector('.score');
-            if (scoreElement) {
-                // 模擬分數變化
-                const currentHome = parseInt(scoreElement.querySelector('.home-score').textContent);
-                const currentAway = parseInt(scoreElement.querySelector('.away-score').textContent);
-                
-                // 隨機增加分數（10% 機率）
-                if (Math.random() < 0.1) {
-                    if (Math.random() < 0.7) {
-                        // 主隊進球
-                        scoreElement.querySelector('.home-score').textContent = currentHome + 1;
-                        showNotification('⚽ 曼聯進球了！');
-                    } else {
-                        // 客隊進球
-                        scoreElement.querySelector('.away-score').textContent = currentAway + 1;
-                        showNotification('⚽ 利物浦進球了！');
-                    }
-                }
-            }
+class FootballPredictorApp {
+    constructor() {
+        this.matches = [];
+        this.currentPredictions = new Map();
+        this.initialized = false;
+        this.updateInterval = null;
+    }
+
+    // 初始化應用
+    async init() {
+        console.log('⚽ 足球預測系統初始化...');
+        
+        try {
+            // 1. 加載賽事數據
+            await this.loadMatches();
+            
+            // 2. 渲染界面
+            this.renderMatches();
+            
+            // 3. 設置事件監聽器
+            this.setupEventListeners();
+            
+            // 4. 開始自動更新
+            this.startAutoUpdate();
+            
+            this.initialized = true;
+            console.log('✅ 系統初始化完成');
+            
+        } catch (error) {
+            console.error('❌ 初始化失敗:', error);
+            this.showError('系統初始化失敗，請刷新頁面重試');
         }
     }
 
-    // 顯示通知
-    function showNotification(message) {
-        const notification = document.createElement('div');
-        notification.className = 'notification';
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-bell"></i>
-                <span>${message}</span>
-            </div>
-        `;
-        
-        // 添加樣式
-        notification.style.position = 'fixed';
-        notification.style.top = '20px';
-        notification.style.right = '20px';
-        notification.style.background = '#1890ff';
-        notification.style.color = 'white';
-        notification.style.padding = '15px 20px';
-        notification.style.borderRadius = '10px';
-        notification.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-        notification.style.zIndex = '9999';
-        notification.style.animation = 'slideIn 0.5s ease';
-        
-        document.body.appendChild(notification);
-        
-        // 3秒後移除
-        setTimeout(() => {
-            notification.style.animation = 'slideOut 0.5s ease';
-            setTimeout(() => notification.remove(), 500);
-        }, 3000);
+    // 加載賽事數據
+    async loadMatches() {
+        try {
+            // 顯示加載狀態
+            this.showLoading();
+            
+            // 從 API 服務獲取數據
+            this.matches = await ApiService.getMatches();
+            
+            // 為每場比賽生成預測
+            await this.generatePredictions();
+            
+            // 隱藏加載狀態
+            this.hideLoading();
+            
+        } catch (error) {
+            console.error('加載賽事數據失敗:', error);
+            this.hideLoading();
+            this.showError('無法獲取賽事數據，使用本地數據');
+        }
     }
 
-    // 添加 CSS 動畫
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
+    // 為所有比賽生成預測
+    async generatePredictions() {
+        const predictionPromises = this.matches.map(async match => {
+            try {
+                const prediction = await PredictionService.predictMatch(
+                    match.homeTeam, 
+                    match.awayTeam
+                );
+                this.currentPredictions.set(match.id, prediction);
+            } catch (error) {
+                console.warn(`預測生成失敗 ${match.homeTeam} vs ${match.awayTeam}:`, error);
             }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+        });
+        
+        await Promise.all(predictionPromises);
+    }
+
+    // 渲染賽事列表
+    renderMatches() {
+        const container = document.getElementById('matches-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (this.matches.length === 0) {
+            container.innerHTML = `
+                <div class="no-matches">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>暫無賽事數據</h3>
+                    <p>請稍後再試，或檢查網絡連接</p>
+                </div>
+            `;
+            return;
         }
         
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
+        this.matches.forEach(match => {
+            const prediction = this.currentPredictions.get(match.id);
+            const matchElement = this.createMatchElement(match, prediction);
+            container.appendChild(matchElement);
+        });
+    }
+
+    // 創建賽事元素
+    createMatchElement(match, prediction) {
+        const element = document.createElement('div');
+        element.className = 'match-card';
+        element.dataset.matchId = match.id;
         
-        .notification-content {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-    `;
-    document.head.appendChild(style);
-
-    // 按鈕點擊事件
-    const predictButtons = document.querySelectorAll('.btn-predict');
-    predictButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const matchCard = this.closest('.match-card');
-            const homeTeam = matchCard.querySelector('.team:first-child span').textContent;
-            const awayTeam = matchCard.querySelector('.team:last-child span').textContent;
-            
-            // 模擬 AI 預測
-            simulatePrediction(homeTeam, awayTeam);
-            
-            // 顯示加載動畫
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 預測中...';
-            this.disabled = true;
-            
-            // 2秒後恢復
-            setTimeout(() => {
-                this.innerHTML = '<i class="fas fa-robot"></i> AI 預測';
-                this.disabled = false;
-            }, 2000);
-        });
-    });
-
-    // 詳細分析按鈕
-    const detailButtons = document.querySelectorAll('.btn-details');
-    detailButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const matchCard = this.closest('.match-card');
-            const homeTeam = matchCard.querySelector('.team:first-child span').textContent;
-            const awayTeam = matchCard.querySelector('.team:last-child span').textContent;
-            
-            // 顯示詳細預測彈窗
-            showDetailedPrediction(homeTeam, awayTeam);
-        });
-    });
-
-    // 模擬 AI 預測
-    function simulatePrediction(homeTeam, awayTeam) {
-        // 隨機生成預測結果
-        const predictions = {
-            score: `${Math.floor(Math.random() * 3)}-${Math.floor(Math.random() * 3)}`,
-            winProbability: Math.floor(Math.random() * 30) + 40,
-            drawProbability: Math.floor(Math.random() * 30) + 20,
-            loseProbability: Math.floor(Math.random() * 30) + 20
+        const matchStatus = this.getStatusText(match.status);
+        const matchTime = this.formatMatchTime(match.date);
+        
+        const predictionData = prediction?.predictions || {
+            '1x2': {
+                homeWin: { probability: 33 },
+                draw: { probability: 34 },
+                awayWin: { probability: 33 }
+            }
         };
         
-        // 確保總和為 100%
-        const total = predictions.winProbability + predictions.drawProbability + predictions.loseProbability;
-        predictions.winProbability = Math.round(predictions.winProbability * 100 / total);
-        predictions.drawProbability = Math.round(predictions.drawProbability * 100 / total);
-        predictions.loseProbability = Math.round(predictions.loseProbability * 100 / total);
+        element.innerHTML = `
+            <div class="match-header">
+                <span class="league">${match.competition}</span>
+                <span class="time">${matchTime}</span>
+                <span class="status ${match.status}">
+                    <i class="fas ${match.status === 'live' ? 'fa-circle' : 'fa-clock'}"></i>
+                    ${matchStatus}
+                </span>
+            </div>
+            
+            <div class="teams">
+                <div class="team home-team">
+                    <div class="team-logo" data-team="${match.homeTeam}"></div>
+                    <span>${match.homeTeam}</span>
+                </div>
+                <div class="vs">VS</div>
+                <div class="team away-team">
+                    <div class="team-logo" data-team="${match.awayTeam}"></div>
+                    <span>${match.awayTeam}</span>
+                </div>
+            </div>
+            
+            ${match.status === 'live' || match.status === 'finished' ? `
+                <div class="score">
+                    <span class="home-score">${match.score?.home || 0}</span>
+                    <span class="divider">-</span>
+                    <span class="away-score">${match.score?.away || 0}</span>
+                </div>
+            ` : ''}
+            
+            <div class="predictions">
+                <div class="prediction-item">
+                    <span>主勝</span>
+                    <div class="prediction-bar">
+                        <div class="bar-fill home" style="width: ${predictionData['1x2'].homeWin.probability}%">
+                            ${predictionData['1x2'].homeWin.probability}%
+                        </div>
+                    </div>
+                </div>
+                <div class="prediction-item">
+                    <span>平局</span>
+                    <div class="prediction-bar">
+                        <div class="bar-fill draw" style="width: ${predictionData['1x2'].draw.probability}%">
+                            ${predictionData['1x2'].draw.probability}%
+                        </div>
+                    </div>
+                </div>
+                <div class="prediction-item">
+                    <span>客勝</span>
+                    <div class="prediction-bar">
+                        <div class="bar-fill away" style="width: ${predictionData['1x2'].awayWin.probability}%">
+                            ${predictionData['1x2'].awayWin.probability}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn-details" data-match-id="${match.id}">
+                <i class="fas fa-chart-bar"></i> 詳細分析
+            </button>
+        `;
         
-        // 顯示結果
-        showNotification(`🤖 AI 預測 ${homeTeam} vs ${awayTeam}: ${predictions.score} (${predictions.winProbability}% 勝率)`);
+        // 添加球隊圖標
+        this.addTeamLogos(element);
+        
+        return element;
     }
 
-    // 顯示詳細預測
-    function showDetailedPrediction(homeTeam, awayTeam) {
-        // 創建模態彈窗
+    // 添加球隊圖標
+    addTeamLogos(element) {
+        const logos = element.querySelectorAll('.team-logo');
+        logos.forEach(logo => {
+            const teamName = logo.dataset.team;
+            const logoUrl = this.getTeamLogoUrl(teamName);
+            if (logoUrl) {
+                logo.style.backgroundImage = `url(${logoUrl})`;
+                logo.style.backgroundSize = 'contain';
+                logo.style.backgroundRepeat = 'no-repeat';
+                logo.style.backgroundPosition = 'center';
+                logo.style.width = '40px';
+                logo.style.height = '40px';
+            }
+        });
+    }
+
+    // 獲取球隊圖標 URL
+    getTeamLogoUrl(teamName) {
+        const logoMap = {
+            '曼聯': 'https://img.icons8.com/color/96/000000/manchester-united.png',
+            '利物浦': 'https://img.icons8.com/color/96/000000/liverpool-fc.png',
+            '曼城': 'https://img.icons8.com/color/96/000000/manchester-city.png',
+            '阿森納': 'https://img.icons8.com/color/96/000000/arsenal-fc.png',
+            '切爾西': 'https://img.icons8.com/color/96/000000/chelsea-fc.png',
+            '熱刺': 'https://img.icons8.com/color/96/000000/tottenham-hotspur.png',
+            '巴塞羅那': 'https://img.icons8.com/color/96/000000/fc-barcelona.png',
+            '皇家馬德里': 'https://img.icons8.com/color/96/000000/real-madrid.png',
+            '拜仁慕尼黑': 'https://img.icons8.com/color/96/000000/bayern-munich.png',
+            '多特蒙德': 'https://img.icons8.com/color/96/000000/borussia-dortmund.png'
+        };
+        
+        return logoMap[teamName] || null;
+    }
+
+    // 獲取狀態文字
+    getStatusText(status) {
+        const statusMap = {
+            'upcoming': '未開始',
+            'live': '進行中',
+            'finished': '已結束',
+            'cancelled': '已取消'
+        };
+        
+        return statusMap[status] || status;
+    }
+
+    // 格式化比賽時間
+    formatMatchTime(dateString) {
+        if (!dateString) return '時間待定';
+        
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffHours = Math.floor((date - now) / (1000 * 60 * 60));
+            
+            if (diffHours < 24) {
+                return date.toLocaleTimeString('zh-HK', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            } else {
+                return date.toLocaleDateString('zh-HK', { 
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+            }
+        } catch (error) {
+            return '時間待定';
+        }
+    }
+
+    // 設置事件監聽器
+    setupEventListeners() {
+        // 詳細分析按鈕
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-details')) {
+                const matchId = e.target.closest('.btn-details').dataset.matchId;
+                this.showDetailedAnalysis(matchId);
+            }
+        });
+        
+        // 刷新按鈕
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshData());
+        }
+        
+        // 設置按鈕
+        const settingsBtn = document.getElementById('settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => this.showSettings());
+        }
+    }
+
+    // 顯示詳細分析
+    async showDetailedAnalysis(matchId) {
+        const match = this.matches.find(m => m.id === matchId);
+        const prediction = this.currentPredictions.get(matchId);
+        
+        if (!match || !prediction) {
+            this.showError('無法獲取詳細分析數據');
+            return;
+        }
+        
+        // 創建模態框
+        this.createAnalysisModal(match, prediction);
+    }
+
+    // 創建分析模態框
+    createAnalysisModal(match, prediction) {
         const modal = document.createElement('div');
-        modal.className = 'prediction-modal';
+        modal.className = 'analysis-modal';
+        
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3><i class="fas fa-chart-bar"></i> ${homeTeam} vs ${awayTeam} 詳細分析</h3>
+                    <h3><i class="fas fa-chart-line"></i> ${match.homeTeam} vs ${match.awayTeam}</h3>
                     <button class="close-modal">&times;</button>
                 </div>
+                
                 <div class="modal-body">
-                    <div class="analysis-grid">
-                        <div class="analysis-item">
-                            <h4>歷史對戰</h4>
-                            <p>近10次交鋒：${homeTeam} 5勝 2平 3負</p>
-                        </div>
-                        <div class="analysis-item">
-                            <h4>近期狀態</h4>
-                            <p>${homeTeam}: 最近5場 3勝1平1負</p>
-                            <p>${awayTeam}: 最近5場 2勝2平1負</p>
-                        </div>
-                        <div class="analysis-item">
-                            <h4>傷病情況</h4>
-                            <p>${homeTeam}: 2名主力缺陣</p>
-                            <p>${awayTeam}: 1名主力缺陣</p>
-                        </div>
-                        <div class="analysis-item">
-                            <h4>天氣影響</h4>
-                            <p>比賽當天：晴天，適合進攻</p>
-                        </div>
+                    <div class="match-info">
+                        <p><strong>聯賽:</strong> ${match.competition}</p>
+                        <p><strong>時間:</strong> ${this.formatMatchTime(match.date)}</p>
+                        <p><strong>狀態:</strong> ${this.getStatusText(match.status)}</p>
+                        ${match.venue ? `<p><strong>場地:</strong> ${match.venue}</p>` : ''}
                     </div>
                     
-                    <div class="prediction-chart">
-                        <h4>預測分布</h4>
-                        <div class="chart-bars">
-                            <div class="chart-bar home-win">
-                                <span>${homeTeam} 勝</span>
-                                <div class="bar" style="height: 45%">45%</div>
+                    <div class="prediction-details">
+                        <h4>預測分析</h4>
+                        <div class="prediction-grid">
+                            <div class="prediction-box">
+                                <h5>最可能比分</h5>
+                                ${prediction.predictions.scores.slice(0, 3).map(score => `
+                                    <p class="score-item">
+                                        <span>${score.score}</span>
+                                        <span class="probability">${score.probability}%</span>
+                                    </p>
+                                `).join('')}
                             </div>
-                            <div class="chart-bar draw">
-                                <span>平局</span>
-                                <div class="bar" style="height: 30%">30%</div>
-                            </div>
-                            <div class="chart-bar away-win">
-                                <span>${awayTeam} 勝</span>
-                                <div class="bar" style="height: 25%">25%</div>
+                            
+                            <div class="prediction-box">
+                                <h5>半全場預測</h5>
+                                ${Object.entries(prediction.predictions.halfFull || {}).slice(0, 4).map(([type, prob]) => `
+                                    <p class="half-full-item">
+                                        <span>${type}</span>
+                                        <span class="probability">${prob}%</span>
+                                    </p>
+                                `).join('')}
                             </div>
                         </div>
                     </div>
                     
-                    <div class="recommendation">
-                        <h4><i class="fas fa-lightbulb"></i> 專家建議</h4>
-                        <p>根據數據分析，${homeTeam}在主場表現強勢，建議關注主隊不敗。大小球方面，雙方近期進攻火力較強，建議關注大球。</p>
+                    <div class="recommendations">
+                        <h5><i class="fas fa-lightbulb"></i> 建議</h5>
+                        <ul>
+                            ${prediction.predictions.recommendations.map(rec => 
+                                `<li>${rec}</li>`
+                            ).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="disclaimer">
+                        <p><i class="fas fa-exclamation-triangle"></i> 注意：此預測僅供參考，實際結果可能有所不同</p>
                     </div>
                 </div>
             </div>
         `;
         
-        // 添加樣式
-        const modalStyle = document.createElement('style');
-        modalStyle.textContent = `
-            .prediction-modal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-                animation: fadeIn 0.3s ease;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; }
-                to { opacity: 1; }
-            }
-            
-            .modal-content {
-                background: white;
-                border-radius: 15px;
-                width: 90%;
-                max-width: 800px;
-                max-height: 90vh;
-                overflow-y: auto;
-                animation: slideUp 0.3s ease;
-            }
-            
-            @keyframes slideUp {
-                from {
-                    transform: translateY(50px);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateY(0);
-                    opacity: 1;
-                }
-            }
-            
-            .modal-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 20px 30px;
-                border-bottom: 1px solid #e8e8e8;
-                background: #1890ff;
-                color: white;
-                border-radius: 15px 15px 0 0;
-            }
-            
-            .modal-header h3 {
-                margin: 0;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-            
-            .close-modal {
-                background: none;
-                border: none;
-                color: white;
-                font-size: 24px;
-                cursor: pointer;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 50%;
-                transition: background 0.3s;
-            }
-            
-            .close-modal:hover {
-                background: rgba(255,255,255,0.2);
-            }
-            
-            .modal-body {
-                padding: 30px;
-            }
-            
-            .analysis-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 20px;
-                margin-bottom: 30px;
-            }
-            
-            .analysis-item {
-                background: #f0f5ff;
-                padding: 20px;
-                border-radius: 10px;
-            }
-            
-            .analysis-item h4 {
-                color: #1890ff;
-                margin-bottom: 10px;
-            }
-            
-            .prediction-chart {
-                margin-bottom: 30px;
-            }
-            
-            .chart-bars {
-                display: flex;
-                justify-content: space-around;
-                align-items: flex-end;
-                height: 200px;
-                padding: 20px;
-                background: #fafafa;
-                border-radius: 10px;
-            }
-            
-            .chart-bar {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-            }
-            
-            .chart-bar .bar {
-                width: 60px;
-                background: #1890ff;
-                color: white;
-                display: flex;
-                align-items: flex-end;
-                justify-content: center;
-                padding-bottom: 5px;
-                border-radius: 5px 5px 0 0;
-                font-weight: bold;
-            }
-            
-            .chart-bar.draw .bar {
-                background: #52c41a;
-            }
-            
-            .chart-bar.away-win .bar {
-                background: #f5222d;
-            }
-            
-            .recommendation {
-                background: #fffbe6;
-                border: 1px solid #ffe58f;
-                border-radius: 10px;
-                padding: 20px;
-            }
-        `;
-        
-        document.head.appendChild(modalStyle);
         document.body.appendChild(modal);
         
-        // 關閉按鈕事件
+        // 關閉按鈕
         modal.querySelector('.close-modal').addEventListener('click', () => {
             modal.remove();
         });
@@ -417,79 +369,111 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // 添加自動更新
-    let updateInterval;
-    
-    // 開始實時更新（如果是進行中的比賽）
-    if (document.querySelector('.status.live')) {
-        updateInterval = setInterval(updateLiveScore, 5000); // 每5秒更新
+    // 刷新數據
+    async refreshData() {
+        console.log('🔄 手動刷新數據...');
+        await this.loadMatches();
+        this.renderMatches();
+        this.showNotification('數據已刷新');
     }
 
-    // 添加導航欄交互
-    const navLinks = document.querySelectorAll('.nav-links a');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            if (this.getAttribute('href') === '#') {
-                e.preventDefault();
-                
-                // 移除所有 active 類
-                navLinks.forEach(l => l.classList.remove('active'));
-                
-                // 添加 active 類到當前點擊的鏈接
-                this.classList.add('active');
-                
-                // 顯示對應內容
-                const linkText = this.textContent.trim();
-                showSection(linkText);
-            }
-        });
-    });
-
-    // 顯示對應區域
-    function showSection(sectionName) {
-        // 這裡可以擴展功能，切換不同區域
-        showNotification(`切換到: ${sectionName}`);
-    }
-
-    // 初始化動畫
-    function initAnimations() {
-        // 數字計數動畫
-        const numbers = document.querySelectorAll('.number');
-        numbers.forEach(number => {
-            const finalValue = parseInt(number.textContent);
-            let currentValue = 0;
-            const increment = finalValue / 50;
-            
-            const timer = setInterval(() => {
-                currentValue += increment;
-                if (currentValue >= finalValue) {
-                    number.textContent = finalValue;
-                    clearInterval(timer);
-                } else {
-                    number.textContent = Math.round(currentValue);
-                }
-            }, 30);
-        });
-        
-        // 進度條動畫
-        const bars = document.querySelectorAll('.bar-fill');
-        bars.forEach(bar => {
-            const width = bar.style.width;
-            bar.style.width = '0%';
-            
-            setTimeout(() => {
-                bar.style.width = width;
-            }, 500);
-        });
-    }
-
-    // 執行初始化動畫
-    setTimeout(initAnimations, 1000);
-
-    // 頁面卸載時清理
-    window.addEventListener('beforeunload', () => {
-        if (updateInterval) {
-            clearInterval(updateInterval);
+    // 開始自動更新
+    startAutoUpdate() {
+        // 清除現有定時器
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
         }
-    });
+        
+        // 每5分鐘更新一次
+        this.updateInterval = setInterval(async () => {
+            console.log('🔄 自動更新數據...');
+            await this.loadMatches();
+            this.renderMatches();
+        }, 5 * 60 * 1000);
+    }
+
+    // 顯示通知
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#52c41a' : '#1890ff'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            animation: slideInRight 0.3s ease;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    // 顯示錯誤
+    showError(message) {
+        this.showNotification(`❌ ${message}`, 'error');
+    }
+
+    // 顯示加載狀態
+    showLoading() {
+        let loader = document.getElementById('loading-indicator');
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'loading-indicator';
+            loader.innerHTML = `
+                <div class="loader">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>加載賽事數據中...</span>
+                </div>
+            `;
+            loader.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255,255,255,0.9);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 9998;
+            `;
+            document.body.appendChild(loader);
+        }
+    }
+
+    // 隱藏加載狀態
+    hideLoading() {
+        const loader = document.getElementById('loading-indicator');
+        if (loader) {
+            loader.remove();
+        }
+    }
+
+    // 顯示設置
+    showSettings() {
+        alert('設置功能開發中...');
+    }
+}
+
+// 啟動應用
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new FootballPredictorApp();
+    window.footballApp = app; // 全局訪問
+    app.init();
 });

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "local_1",
+    "homeTeam": "曼聯",
+    "awayTeam": "利物浦",
+    "competition": "英格蘭超級聯賽",
+    "status": "upcoming",
+    "date": "2024-01-20T20:00:00Z",
+    "score": { "home": 0, "away": 0 },
+    "venue": "老特拉福德球場"
+  },
+  {
+    "id": "local_2",
+    "homeTeam": "阿森納",
+    "awayTeam": "切爾西",
+    "competition": "英格蘭超級聯賽",
+    "status": "upcoming",
+    "date": "2024-01-21T16:30:00Z",
+    "score": { "home": 0, "away": 0 },
+    "venue": "酋長球場"
+  },
+  {
+    "id": "local_3",
+    "homeTeam": "巴塞羅那",
+    "awayTeam": "皇家馬德里",
+    "competition": "西班牙甲級聯賽",
+    "status": "upcoming",
+    "date": "2024-01-22T21:00:00Z",
+    "score": { "home": 0, "away": 0 },
+    "venue": "諾坎普球場"
+  },
+  {
+    "id": "local_4",
+    "homeTeam": "拜仁慕尼黑",
+    "awayTeam": "多特蒙德",
+    "competition": "德國甲級聯賽",
+    "status": "upcoming",
+    "date": "2024-01-23T19:30:00Z",
+    "score": { "home": 0, "away": 0 },
+    "venue": "安聯球場"
+  },
+  {
+    "id": "local_5",
+    "homeTeam": "AC米蘭",
+    "awayTeam": "國際米蘭",
+    "competition": "意大利甲級聯賽",
+    "status": "upcoming",
+    "date": "2024-01-24T20:45:00Z",
+    "score": { "home": 0, "away": 0 },
+    "venue": "聖西羅球場"
+  }
+]

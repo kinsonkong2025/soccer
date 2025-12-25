@@ -1,0 +1,68 @@
+# Netlify部署配置文件
+
+[build]
+  # 构建命令
+  command = "npm run build"
+  
+  # 构建输出目录
+  publish = "build"
+  
+  # 环境变量（开发环境）
+  [build.environment]
+    NODE_VERSION = "18.17.0"
+    NPM_VERSION = "9.6.7"
+
+# 重定向规则
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 自定义头信息（安全设置）
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    
+    # Content Security Policy (CSP)
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https:;
+      connect-src 'self' https://api.football-data.org https://*.netlify.app wss://*.netlify.app;
+      frame-ancestors 'none';
+    """
+
+# 环境变量上下文配置
+[context.production]
+  command = "npm run build:prod"
+  
+  [context.production.environment]
+    REACT_APP_ENV = "production"
+    REACT_APP_VERSION = "1.0.0"
+
+[context.deploy-preview]
+  command = "npm run build"
+  
+  [context.deploy-preview.environment]
+    REACT_APP_ENV = "staging"
+
+[context.branch-deploy]
+  command = "npm run build"
+  
+  [context.branch-deploy.environment]
+    REACT_APP_ENV = "development"
+
+# 插件配置（可选）
+[[plugins]]
+  package = "@netlify/plugin-sitemap"
+  
+  [plugins.inputs]
+    baseUrl = "https://your-site.netlify.app"
+    changefreq = "weekly"
+    priority = 0.8
